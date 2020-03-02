@@ -2,10 +2,10 @@
 
 from collections import defaultdict, deque
 import logging
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Set
 
 import twitter
-from twitter_operator import GetFriendIDs
+from twitter_operator import GetFriendIDs, GetUserTimeline
 
 from constants import TWITTER_API_CONSUMER_KEY, TWITTER_API_CONSUMER_SECRET
 from database import get_all_api_keys
@@ -80,6 +80,38 @@ def calculate_industry_group(seed: List[int], depth: int = 2) -> Dict[int, int]:
                 users_queue.append((f, n + 1))
             n_followers[f] += 1
     return n_followers
+
+
+def pull_industry_likes(users: List[int]) -> List[Dict[str, Any]]:
+    """
+    Return a list of the specified users' posts and the number of likes they
+    received.
+
+    TODO(@neel): Add a `since_unix_time` parameter.
+
+    Parameters
+    ----------
+    users : List[int]
+        List of Twitter API user IDs
+    """
+    posts: List[Dict[str, Any]] = []
+    client = ParallelTwitterClient(apis=oauth_dicts_to_apis(get_all_api_keys()))
+    LOGGER.info(
+        'Pulled {} valid keys'.format(len(client.operators[GetUserTimeline]))
+    )
+    for u in users:
+        user_posts = client.get_user_timeline(user_id=u,
+                                              trim_user=True,
+                                              include_rts=False,
+                                              exclude_replies=True)
+        posts.extend([{
+            # Fields are set on the `Status` object by reflection
+            'id': p.id,
+            'user_id': p.user.id,
+            'timestamp': p.created_at_in_seconds,
+            'n_likes': p.favorite_count
+        } for p in user_posts])
+    return posts
 
 
 if __name__ == '__main__':

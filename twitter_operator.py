@@ -3,7 +3,7 @@
 from abc import ABC
 from functools import total_ordering
 import logging
-from typing import Any, Optional, Set
+from typing import Any, List, Optional, Set
 
 import twitter
 
@@ -15,6 +15,9 @@ class TwitterOp(ABC):
     """
     A Twitter API operator paired with an API key.
     """
+
+    reqs_per_minute = 1
+
     def __init__(self, api: twitter.Api, unique_id: Optional[int] = None):
         """
         Raise a `TwitterError` if the API key is invalid. The caller is
@@ -100,3 +103,52 @@ class GetFriendIDs(TwitterOp):
     @property
     def rate_limit_endpoint(self) -> str:
         return '/friends/ids.json'
+
+
+class GetUserTimeline(TwitterOp):
+    """
+    An operator to get the posts on a user's timeline.
+    """
+
+    reqs_per_minute = 60
+
+    def _invoke(
+            self,
+            user_id: Optional[int] = None,
+            screen_name: Optional[str] = None,
+            trim_user: Optional[bool] = False,
+            include_rts: Optional[bool] = True,
+            exclude_replies: Optional[bool] = False,
+            max_count: Optional[int] = 200
+    ) -> List[twitter.Status]:
+        """
+        Return the posts on the specified user's timeline.
+
+        Parameters
+        ----------
+        user_id : Optional[int]
+            The Twitter ID of the specified user
+        screen_name : Optional[str]
+            The Twitter handle of the specified user
+        trim_user : Optional[bool]
+            If True, include only a user ID rather than the full user object.
+            Defaults to False.
+        include_rts : Optional[bool]
+            If True, include the retweets on the user's timeline. Defaults to
+            True.
+        exclude_replies : Optional[bool]
+            If True, do not include posts that were replies. Defaults to False.
+        max_count : Optional[int]
+            The maximum number of posts to return with a maximum of 200.
+            Defaults to 200.
+        """
+        return self.api.GetUserTimeline(user_id=user_id,
+                                        screen_name=screen_name,
+                                        trim_user=trim_user,
+                                        include_rts=include_rts,
+                                        exclude_replies=exclude_replies,
+                                        count=max_count)
+
+    @property
+    def rate_limit_endpoint(self) -> str:
+        return '/statuses/user_timeline.json'

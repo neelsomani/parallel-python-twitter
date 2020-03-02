@@ -3,14 +3,14 @@ API keys. """
 
 import logging
 import time
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Set, Type
 import heapq
 
 import twitter
 from twitter import TwitterError
 
 from error import OutOfKeysError, not_authorized_error, rate_limit_error
-from twitter_operator import GetFriendIDs, TwitterOp
+from twitter_operator import GetFriendIDs, GetUserTimeline, TwitterOp
 
 LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +19,8 @@ class ParallelTwitterClient:
     """ A Twitter client to distribute requests across multiple API keys. """
     def __init__(self, apis: List[twitter.Api]):
         self.operators: Dict[Type[TwitterOp], List[TwitterOp]] = {
-            GetFriendIDs: _api_keys_to_ops(apis, GetFriendIDs)
+            GetFriendIDs: _api_keys_to_ops(apis, GetFriendIDs),
+            GetUserTimeline: _api_keys_to_ops(apis, GetUserTimeline)
         }
         for op in self.operators:
             heapq.heapify(self.operators[op])
@@ -42,10 +43,10 @@ class ParallelTwitterClient:
             Parameters to pass to the `TwitterOp`
         """
         time_since_last = time.time() - self.last_call
-        # Assuming 15 requests / 15 minutes, we should stagger at about
-        # 1 request per minute per key
-        if time_since_last < 60 / len(self.operators[fn]):
-            time.sleep(60 / len(self.operators[fn]) - time_since_last)
+        # Stagger at about `reqs_per_minute` requests per minute per key
+        stagger_rate = 60 / len(self.operators[fn]) / fn.reqs_per_minute
+        if time_since_last < stagger_rate:
+            time.sleep(stagger_rate - time_since_last)
         self.last_call = time.time()
 
         self.n_requests += 1
@@ -82,7 +83,7 @@ class ParallelTwitterClient:
     def get_friend_ids(self,
                        user_id: Optional[int] = None,
                        screen_name: Optional[str] = None,
-                       max_count: Optional[int] = None) -> List[int]:
+                       max_count: Optional[int] = None) -> Set[int]:
         """
         Get the users that the specified user is following.
 
@@ -98,6 +99,44 @@ class ParallelTwitterClient:
         return self._parallel_call(GetFriendIDs,
                                    user_id,
                                    screen_name,
+                                   max_count)
+
+    def get_user_timeline(
+            self,
+            user_id: Optional[int] = None,
+            screen_name: Optional[str] = None,
+            trim_user: Optional[bool] = False,
+            include_rts: Optional[bool] = True,
+            exclude_replies: Optional[bool] = False,
+            max_count: Optional[int] = 200
+    ) -> List[twitter.Status]:
+        """
+        Return the posts on the specified user's timeline.
+
+        Parameters
+        ----------
+        user_id : Optional[int]
+            The Twitter ID of the specified user
+        screen_name : Optional[str]
+            The Twitter handle of the specified user
+        trim_user : Optional[bool]
+            If True, include only a user ID rather than the full user object.
+            Defaults to False.
+        include_rts : Optional[bool]
+            If True, include the retweets on the user's timeline. Defaults to
+            True.
+        exclude_replies : Optional[bool]
+            If True, do not include posts that were replies. Defaults to False.
+        max_count : Optional[int]
+            The maximum number of posts to return with a maximum of 200.
+            Defaults to 200.
+        """
+        return self._parallel_call(GetUserTimeline,
+                                   user_id,
+                                   screen_name,
+                                   trim_user,
+                                   include_rts,
+                                   exclude_replies,
                                    max_count)
 
 
