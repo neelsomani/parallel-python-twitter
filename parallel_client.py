@@ -10,17 +10,24 @@ import twitter
 from twitter import TwitterError
 
 from error import OutOfKeysError, not_authorized_error, rate_limit_error
-from twitter_operator import GetFriendIDs, GetUserTimeline, TwitterOp
+from twitter_operator import (
+    GetFriendIDs,
+    GetUserTimeline,
+    TwitterOp,
+    UsersLookup
+)
 
 LOGGER = logging.getLogger(__name__)
 
 
 class ParallelTwitterClient:
     """ A Twitter client to distribute requests across multiple API keys. """
+    OPERATORS = [GetFriendIDs, GetUserTimeline, UsersLookup]
+
     def __init__(self, apis: List[twitter.Api]):
         self.operators: Dict[Type[TwitterOp], List[TwitterOp]] = {
-            GetFriendIDs: _api_keys_to_ops(apis, GetFriendIDs),
-            GetUserTimeline: _api_keys_to_ops(apis, GetUserTimeline)
+            op: _api_keys_to_ops(apis, op)
+            for op in ParallelTwitterClient.OPERATORS
         }
         for op in self.operators:
             heapq.heapify(self.operators[op])
@@ -138,6 +145,25 @@ class ParallelTwitterClient:
                                    include_rts,
                                    exclude_replies,
                                    max_count)
+
+    def users_lookup(self, user_ids: List[int]) -> List[twitter.User]:
+        """
+        Return a list of hydrated `User` objects.
+
+        Parameters
+        ----------
+        user_ids : List[int]
+            List of Twitter IDs to hydrate
+        """
+        if len(user_ids) == 0:
+            return []
+        users: List[twitter.User] = []
+        for i in range((len(user_ids) - 1) // 100 + 1):
+            users.extend(self._parallel_call(
+                UsersLookup,
+                user_ids[100 * i: 100 * (i + 1)]
+            ))
+        return users
 
 
 def _add_all_to_heap(lst: List[TwitterOp], heap: List[TwitterOp]) -> None:

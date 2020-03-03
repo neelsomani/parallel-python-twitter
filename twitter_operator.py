@@ -152,3 +152,26 @@ class GetUserTimeline(TwitterOp):
     @property
     def rate_limit_endpoint(self) -> str:
         return '/statuses/user_timeline.json'
+
+
+class UsersLookup(TwitterOp):
+    """
+    Hydrate a list of user IDs.
+    """
+
+    reqs_per_minute = 60
+
+    def _invoke(self, user_ids: List[int]) -> List[twitter.User]:
+        """
+        Return a list of hydrated `User` objects.
+
+        Parameters
+        ----------
+        user_ids : List[int]
+            List of Twitter IDs to hydrate
+        """
+        return self.api.UsersLookup(user_id=user_ids)
+
+    @property
+    def rate_limit_endpoint(self) -> str:
+        return '/users/lookup.json'

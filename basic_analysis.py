@@ -5,7 +5,7 @@ import logging
 from typing import Any, Dict, List, Set
 
 import twitter
-from twitter_operator import GetFriendIDs, GetUserTimeline
+from twitter_operator import GetFriendIDs, GetUserTimeline, UsersLookup
 
 from constants import TWITTER_API_CONSUMER_KEY, TWITTER_API_CONSUMER_SECRET
 from database import get_all_api_keys
@@ -112,6 +112,32 @@ def pull_industry_likes(users: List[int]) -> List[Dict[str, Any]]:
             'n_likes': p.favorite_count
         } for p in user_posts])
     return posts
+
+
+def pull_hydrated_users(users: List[int]) -> List[Dict[str, Any]]:
+    """
+    Return a list of dictionaries containing features for each user.
+
+    Parameters
+    ----------
+    users : List[int]
+        List of Twitter API user IDs
+    """
+    client = ParallelTwitterClient(apis=oauth_dicts_to_apis(get_all_api_keys()))
+    LOGGER.info(
+        'Pulled {} valid keys'.format(len(client.operators[UsersLookup]))
+    )
+    return [
+        {
+            # Fields are set on the `User` object by reflection
+            'id': u.id,
+            'handle': u.screen_name,
+            'location': u.location,
+            'verified': u.verified,
+            'followers': u.followers_count,
+            'friends': u.friends_count
+        } for u in client.users_lookup(users)
+    ]
 
 
 if __name__ == '__main__':
