@@ -175,3 +175,37 @@ class UsersLookup(TwitterOp):
     @property
     def rate_limit_endpoint(self) -> str:
         return '/users/lookup.json'
+
+
+class GetFavorites(TwitterOp):
+    """
+    Get a list of the specified user's favorited tweets.
+    """
+
+    reqs_per_minute = 5
+
+    def _invoke(self,
+                user_id: Optional[int] = None,
+                screen_name: Optional[str] = None,
+                max_count: Optional[int] = 200) -> List[twitter.Status]:
+        """
+        Return a list of `Status` objects which the user favorited.
+
+        Parameters
+        ----------
+        user_id : Optional[int]
+            The Twitter ID of the specified user
+        screen_name : Optional[str]
+            The Twitter handle of the specified user
+        max_count : Optional[int]
+            The maximum number of posts to return with a maximum of 200.
+            Defaults to 200.
+        """
+        return self.api.GetFavorites(user_id=user_id,
+                                     screen_name=screen_name,
+                                     count=max_count,
+                                     include_entities=False)
+
+    @property
+    def rate_limit_endpoint(self) -> str:
+        return '/favorites/list.json'

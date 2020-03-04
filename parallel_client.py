@@ -11,6 +11,7 @@ from twitter import TwitterError
 
 from error import OutOfKeysError, not_authorized_error, rate_limit_error
 from twitter_operator import (
+    GetFavorites,
     GetFriendIDs,
     GetUserTimeline,
     TwitterOp,
@@ -22,7 +23,7 @@ LOGGER = logging.getLogger(__name__)
 
 class ParallelTwitterClient:
     """ A Twitter client to distribute requests across multiple API keys. """
-    OPERATORS = [GetFriendIDs, GetUserTimeline, UsersLookup]
+    OPERATORS = [GetFavorites, GetFriendIDs, GetUserTimeline, UsersLookup]
 
     def __init__(self, apis: List[twitter.Api]):
         self.operators: Dict[Type[TwitterOp], List[TwitterOp]] = {
@@ -164,6 +165,30 @@ class ParallelTwitterClient:
                 user_ids[100 * i: 100 * (i + 1)]
             ))
         return users
+
+    def get_favorites(
+            self,
+            user_id: Optional[int] = None,
+            screen_name: Optional[str] = None,
+            max_count: Optional[int] = 200
+    ) -> List[twitter.Status]:
+        """
+        Return a list of `Status` objects which the user favorited.
+
+        Parameters
+        ----------
+        user_id : Optional[int]
+            The Twitter ID of the specified user
+        screen_name : Optional[str]
+            The Twitter handle of the specified user
+        max_count : Optional[int]
+            The maximum number of posts to return with a maximum of 200.
+            Defaults to 200.
+        """
+        return self._parallel_call(GetFavorites,
+                                   user_id,
+                                   screen_name,
+                                   max_count)
 
 
 def _add_all_to_heap(lst: List[TwitterOp], heap: List[TwitterOp]) -> None:

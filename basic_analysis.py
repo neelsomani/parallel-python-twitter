@@ -5,11 +5,11 @@ import logging
 from typing import Any, Dict, List, Set
 
 import twitter
-from twitter_operator import GetFriendIDs, GetUserTimeline, UsersLookup
 
 from constants import TWITTER_API_CONSUMER_KEY, TWITTER_API_CONSUMER_SECRET
 from database import get_all_api_keys
 from parallel_client import ParallelTwitterClient
+from twitter_operator import GetFriendIDs, GetUserTimeline, UsersLookup
 
 LOGGER = logging.getLogger(__name__)
 # The maximum number of a given user's friends that we should explore
@@ -138,6 +138,35 @@ def pull_hydrated_users(users: List[int]) -> List[Dict[str, Any]]:
             'friends': u.friends_count
         } for u in client.users_lookup(users)
     ]
+
+
+def pull_users_likes(users: List[int]) -> List[Dict[str, Any]]:
+    """
+    Return the last 200 posts that each of the specified users liked.
+
+    Parameters
+    ----------
+    users : List[int]
+        List of Twitter API user IDs
+    """
+    client = ParallelTwitterClient(apis=oauth_dicts_to_apis(get_all_api_keys()))
+    LOGGER.info(
+        'Pulled {} valid keys'.format(len(client.operators[UsersLookup]))
+    )
+    posts = []
+    for idx, u in enumerate(users):
+        posts.extend([
+            {
+                # Fields are set on the `Status` object by reflection
+                'id': p.id,
+                'user_id': p.user.id,
+                'timestamp': p.created_at_in_seconds,
+                'n_likes': p.favorite_count,
+                'favorited_by': u
+            }
+            for p in client.get_favorites(user_id=u, max_count=200)
+        ])
+    return posts
 
 
 if __name__ == '__main__':
