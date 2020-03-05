@@ -177,6 +177,30 @@ class UsersLookup(TwitterOp):
         return '/users/lookup.json'
 
 
+class StatusesLookup(TwitterOp):
+    """
+    Hydrate a list of post IDs.
+    """
+
+    reqs_per_minute = 60
+
+    def _invoke(self, post_ids: List[int]) -> List[twitter.Status]:
+        """
+        Return a list of hydrated `Status` objects.
+
+        Parameters
+        ----------
+        post_ids : List[int]
+            List of Twitter post IDs to hydrate
+        """
+        return self.api.GetStatuses(status_ids=post_ids,
+                                    include_entities=True)
+
+    @property
+    def rate_limit_endpoint(self) -> str:
+        return '/statuses/lookup.json'
+
+
 class GetFavorites(TwitterOp):
     """
     Get a list of the specified user's favorited tweets.

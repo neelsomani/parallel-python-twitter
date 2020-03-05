@@ -9,7 +9,12 @@ import twitter
 from constants import TWITTER_API_CONSUMER_KEY, TWITTER_API_CONSUMER_SECRET
 from database import get_all_api_keys
 from parallel_client import ParallelTwitterClient
-from twitter_operator import GetFriendIDs, GetUserTimeline, UsersLookup
+from twitter_operator import (
+    GetFriendIDs,
+    GetUserTimeline,
+    StatusesLookup,
+    UsersLookup
+)
 
 LOGGER = logging.getLogger(__name__)
 # The maximum number of a given user's friends that we should explore
@@ -137,6 +142,40 @@ def pull_hydrated_users(users: List[int]) -> List[Dict[str, Any]]:
             'followers': u.followers_count,
             'friends': u.friends_count
         } for u in client.users_lookup(users)
+    ]
+
+
+def pull_hydrated_posts(posts: List[int]) -> List[Dict[str, Any]]:
+    """
+    Return a list of dictionaries containing the hydrated data for each
+    tweet.
+
+    Parameters
+    ----------
+    posts : List[int]
+        List of post IDs from the Twitter API
+    """
+    client = ParallelTwitterClient(apis=oauth_dicts_to_apis(get_all_api_keys()))
+    LOGGER.info(
+        'Pulled {} valid keys'.format(len(client.operators[StatusesLookup]))
+    )
+    return [
+        {
+            # Fields are set on the `Status` object by reflection
+            'id': p.id,
+            'user_id': p.user.id,
+            'text': p.text,
+            'full_text': p.full_text,
+            'n_likes': p.favorite_count,
+            'n_retweets': p.retweet_count,
+            'location': p.location,
+            'geo': p.geo,
+            'url': 'https://www.twitter.com/{0}/status/{1}'.format(
+                p.user.screen_name, p.id
+            ),
+            'timestamp': p.created_at_in_seconds
+
+        } for p in client.statuses_lookup(posts)
     ]
 
 

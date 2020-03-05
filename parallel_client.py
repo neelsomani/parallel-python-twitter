@@ -14,6 +14,7 @@ from twitter_operator import (
     GetFavorites,
     GetFriendIDs,
     GetUserTimeline,
+    StatusesLookup,
     TwitterOp,
     UsersLookup
 )
@@ -23,7 +24,13 @@ LOGGER = logging.getLogger(__name__)
 
 class ParallelTwitterClient:
     """ A Twitter client to distribute requests across multiple API keys. """
-    OPERATORS = [GetFavorites, GetFriendIDs, GetUserTimeline, UsersLookup]
+    OPERATORS = [
+        GetFavorites,
+        GetFriendIDs,
+        GetUserTimeline,
+        StatusesLookup,
+        UsersLookup
+    ]
 
     def __init__(self, apis: List[twitter.Api]):
         self.operators: Dict[Type[TwitterOp], List[TwitterOp]] = {
@@ -165,6 +172,25 @@ class ParallelTwitterClient:
                 user_ids[100 * i: 100 * (i + 1)]
             ))
         return users
+
+    def statuses_lookup(self, post_ids: List[int]) -> List[twitter.Status]:
+        """
+        Return a list of hydrated `Status` objects.
+
+        Parameters
+        ----------
+        post_ids : List[int]
+            List of Twitter post IDs to hydrate
+        """
+        if len(post_ids) == 0:
+            return []
+        posts: List[twitter.Status] = []
+        for i in range((len(post_ids) - 1) // 100 + 1):
+            posts.extend(self._parallel_call(
+                StatusesLookup,
+                post_ids[100 * i: 100 * (i + 1)]
+            ))
+        return posts
 
     def get_favorites(
             self,
