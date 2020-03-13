@@ -108,7 +108,8 @@ def pull_industry_likes(users: List[int]) -> List[Dict[str, Any]]:
         user_posts = client.get_user_timeline(user_id=u,
                                               trim_user=True,
                                               include_rts=False,
-                                              exclude_replies=True)
+                                              exclude_replies=True,
+                                              min_count=2000)
         posts.extend([{
             # Fields are set on the `Status` object by reflection
             'id': p.id,

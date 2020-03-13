@@ -123,7 +123,8 @@ class ParallelTwitterClient:
             trim_user: Optional[bool] = False,
             include_rts: Optional[bool] = True,
             exclude_replies: Optional[bool] = False,
-            max_count: Optional[int] = 200
+            min_count: int = 1,
+            max_requests: int = 100000
     ) -> List[twitter.Status]:
         """
         Return the posts on the specified user's timeline.
@@ -142,17 +143,34 @@ class ParallelTwitterClient:
             True.
         exclude_replies : Optional[bool]
             If True, do not include posts that were replies. Defaults to False.
-        max_count : Optional[int]
-            The maximum number of posts to return with a maximum of 200.
-            Defaults to 200.
+        min_count : Optional[int]
+            The minimum number of posts to return. Posts are fetched in
+            increments of 200 per request. Defaults to 1.
+        max_requests : int
+            The maximum number of API requests to use. Defaults to 100000.
         """
-        return self._parallel_call(GetUserTimeline,
-                                   user_id,
-                                   screen_name,
-                                   trim_user,
-                                   include_rts,
-                                   exclude_replies,
-                                   max_count)
+        posts: List[twitter.Status] = []
+        max_id: Optional[int] = None
+        calls = 0
+        while len(posts) < min_count and calls < max_requests:
+            current_posts = self._parallel_call(GetUserTimeline,
+                                                user_id,
+                                                screen_name,
+                                                trim_user,
+                                                include_rts,
+                                                exclude_replies,
+                                                max_id)
+            # Return if there are no unseen posts
+            if len(current_posts) == 0 or \
+                    len(current_posts) == 1 and current_posts[0].id == max_id:
+                return posts
+            # Throw away the post that is equal to max_id
+            if current_posts[0].id == max_id:
+                current_posts.pop(0)
+            max_id = min(p.id for p in current_posts)
+            posts.extend(current_posts)
+            calls += 1
+        return posts
 
     def users_lookup(self, user_ids: List[int]) -> List[twitter.User]:
         """

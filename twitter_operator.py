@@ -119,7 +119,7 @@ class GetUserTimeline(TwitterOp):
             trim_user: Optional[bool] = False,
             include_rts: Optional[bool] = True,
             exclude_replies: Optional[bool] = False,
-            max_count: Optional[int] = 200
+            max_id: Optional[int] = None
     ) -> List[twitter.Status]:
         """
         Return the posts on the specified user's timeline.
@@ -138,16 +138,17 @@ class GetUserTimeline(TwitterOp):
             True.
         exclude_replies : Optional[bool]
             If True, do not include posts that were replies. Defaults to False.
-        max_count : Optional[int]
-            The maximum number of posts to return with a maximum of 200.
-            Defaults to 200.
+        max_id : Optional[int]
+            Only return posts older than or equal to the specified ID. Defaults
+            to None.
         """
         return self.api.GetUserTimeline(user_id=user_id,
                                         screen_name=screen_name,
                                         trim_user=trim_user,
                                         include_rts=include_rts,
                                         exclude_replies=exclude_replies,
-                                        count=max_count)
+                                        count=200,
+                                        max_id=max_id)
 
     @property
     def rate_limit_endpoint(self) -> str:
