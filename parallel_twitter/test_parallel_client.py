@@ -3,9 +3,9 @@
 import pytest
 from unittest.mock import patch
 
-from error import OutOfKeysError
-from mock_api import *
-from parallel_client import ParallelTwitterClient
+from parallel_twitter.error import OutOfKeysError
+from parallel_twitter.mock_api import *
+from parallel_twitter.parallel_client import ParallelTwitterClient
 
 
 @patch('twitter.Api')

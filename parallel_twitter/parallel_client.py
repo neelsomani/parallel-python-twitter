@@ -9,8 +9,8 @@ import heapq
 import twitter
 from twitter import TwitterError
 
-from error import OutOfKeysError, not_authorized_error, rate_limit_error
-from twitter_operator import (
+from parallel_twitter.error import OutOfKeysError, not_authorized_error, rate_limit_error
+from parallel_twitter.twitter_operator import (
     GetFavorites,
     GetFriendIDs,
     GetUserTimeline,
@@ -233,6 +233,39 @@ class ParallelTwitterClient:
                                    user_id,
                                    screen_name,
                                    max_count)
+
+
+def oauth_dicts_to_apis(oauth_dicts: List[Dict[str, str]],
+                        api_consumer_key: str,
+                        api_consumer_secret: str) -> List[twitter.Api]:
+    """ Convert a list of dictionaries to a list of Twitter API objects.
+    Each dictionary should contain a key for `oauth_token` and a key
+    for `oauth_token_secret`.
+
+    Parameters
+    ----------
+    oauth_dicts : List[Dict[str, str]]
+        A list of dictionaries representing valid OAuth tokens.
+        There should be a key for `oauth_token` and a key for
+        `oauth_token_secret`
+    api_consumer_key : str
+        Twitter API consumer key to be used for all
+        `twitter.Api` objects
+    api_consumer_secret : str
+        Twitter API consumer secret to be used for all
+        `twitter.Api` objects
+    """
+    apis = []
+    for o in oauth_dicts:
+        apis.append(
+            twitter.Api(
+                consumer_key=api_consumer_key,
+                consumer_secret=api_consumer_secret,
+                access_token_key=o['oauth_token'],
+                access_token_secret=o['oauth_token_secret']
+            )
+        )
+    return apis
 
 
 def _add_all_to_heap(lst: List[TwitterOp], heap: List[TwitterOp]) -> None:

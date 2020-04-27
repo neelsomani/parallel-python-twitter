@@ -6,10 +6,8 @@ from typing import Any, Dict, List, Set
 
 import twitter
 
-from constants import TWITTER_API_CONSUMER_KEY, TWITTER_API_CONSUMER_SECRET
-from database import get_all_api_keys
-from parallel_client import ParallelTwitterClient
-from twitter_operator import (
+from parallel_twitter.parallel_client import ParallelTwitterClient
+from parallel_twitter.twitter_operator import (
     GetFriendIDs,
     GetUserTimeline,
     StatusesLookup,
@@ -17,34 +15,12 @@ from twitter_operator import (
 )
 
 LOGGER = logging.getLogger(__name__)
-# The maximum number of a given user's friends that we should explore
-MAX_COUNT = 500
 
 
-def oauth_dicts_to_apis(oauth_dicts: List[Dict[str, str]]) -> List[twitter.Api]:
-    """ Convert a list of dictionaries to a list of Twitter API objects.
-    Each dictionary should contain a key for `oauth_token` and a key
-    for `oauth_token_secret`.
-
-    Parameters
-    ----------
-    oauth_dicts : List[Dict[str, str]]
-        A list of dictionaries representing valid OAuth tokens.
-    """
-    apis = []
-    for o in oauth_dicts:
-        apis.append(
-            twitter.Api(
-                consumer_key=TWITTER_API_CONSUMER_KEY,
-                consumer_secret=TWITTER_API_CONSUMER_SECRET,
-                access_token_key=o['oauth_token'],
-                access_token_secret=o['oauth_token_secret']
-            )
-        )
-    return apis
-
-
-def calculate_industry_group(seed: List[int], depth: int = 2) -> Dict[int, int]:
+def calculate_industry_group(seed: List[int],
+                             depth: int,
+                             apis: List[twitter.Api],
+                             max_count: int=200) -> Dict[int, int]:
     """
     Run a breadth-first search on a set of users' friends on Twitter.
     Return the number of followers each user has within the group of nth-degree
@@ -62,9 +38,14 @@ def calculate_industry_group(seed: List[int], depth: int = 2) -> Dict[int, int]:
         List of Twitter user IDs to initialize the BFS
     depth : int
         The depth of the BFS. Defaults to 2.
+    apis : List[twitter.Api]
+        A list of twitter.Api objects, which can be obtained from
+        `parallel_client.oauth_dicts_to_apis`
+    max_count : int
+        The maximum number of friends to pull for a given user
     """
     n_followers: Dict[int, int] = defaultdict(int)
-    client = ParallelTwitterClient(apis=oauth_dicts_to_apis(get_all_api_keys()))
+    client = ParallelTwitterClient(apis=apis)
     LOGGER.info(
         'Pulled {} valid keys'.format(len(client.operators[GetFriendIDs]))
     )
@@ -79,7 +60,8 @@ def calculate_industry_group(seed: List[int], depth: int = 2) -> Dict[int, int]:
             LOGGER.info('Reached depth: {}'.format(n))
             LOGGER.info('Size of queue: {}'.format(len(users_queue)))
 
-        user_friends = client.get_friend_ids(user_id=u, max_count=MAX_COUNT)
+        user_friends = client.get_friend_ids(user_id=u,
+                                             max_count=max_count)
         for f in user_friends:
             if n < depth and f not in n_followers:
                 users_queue.append((f, n + 1))
@@ -87,7 +69,8 @@ def calculate_industry_group(seed: List[int], depth: int = 2) -> Dict[int, int]:
     return n_followers
 
 
-def pull_industry_likes(users: List[int]) -> List[Dict[str, Any]]:
+def pull_users_posts(users: List[int],
+                     apis: List[twitter.Api]) -> List[Dict[str, Any]]:
     """
     Return a list of the specified users' posts and the number of likes they
     received.
@@ -98,9 +81,12 @@ def pull_industry_likes(users: List[int]) -> List[Dict[str, Any]]:
     ----------
     users : List[int]
         List of Twitter API user IDs
+    apis : List[twitter.Api]
+        A list of twitter.Api objects, which can be obtained from
+        `parallel_client.oauth_dicts_to_apis`
     """
     posts: List[Dict[str, Any]] = []
-    client = ParallelTwitterClient(apis=oauth_dicts_to_apis(get_all_api_keys()))
+    client = ParallelTwitterClient(apis=apis)
     LOGGER.info(
         'Pulled {} valid keys'.format(len(client.operators[GetUserTimeline]))
     )
@@ -120,7 +106,8 @@ def pull_industry_likes(users: List[int]) -> List[Dict[str, Any]]:
     return posts
 
 
-def pull_hydrated_users(users: List[int]) -> List[Dict[str, Any]]:
+def pull_hydrated_users(users: List[int],
+                        apis: List[twitter.Api]) -> List[Dict[str, Any]]:
     """
     Return a list of dictionaries containing features for each user.
 
@@ -128,8 +115,11 @@ def pull_hydrated_users(users: List[int]) -> List[Dict[str, Any]]:
     ----------
     users : List[int]
         List of Twitter API user IDs
+    apis : List[twitter.Api]
+        A list of twitter.Api objects, which can be obtained from
+        `parallel_client.oauth_dicts_to_apis`
     """
-    client = ParallelTwitterClient(apis=oauth_dicts_to_apis(get_all_api_keys()))
+    client = ParallelTwitterClient(apis=apis)
     LOGGER.info(
         'Pulled {} valid keys'.format(len(client.operators[UsersLookup]))
     )
@@ -146,7 +136,8 @@ def pull_hydrated_users(users: List[int]) -> List[Dict[str, Any]]:
     ]
 
 
-def pull_hydrated_posts(posts: List[int]) -> List[Dict[str, Any]]:
+def pull_hydrated_posts(posts: List[int],
+                        apis: List[twitter.Api]) -> List[Dict[str, Any]]:
     """
     Return a list of dictionaries containing the hydrated data for each
     tweet.
@@ -155,8 +146,11 @@ def pull_hydrated_posts(posts: List[int]) -> List[Dict[str, Any]]:
     ----------
     posts : List[int]
         List of post IDs from the Twitter API
+    apis : List[twitter.Api]
+        A list of twitter.Api objects, which can be obtained from
+        `parallel_client.oauth_dicts_to_apis`
     """
-    client = ParallelTwitterClient(apis=oauth_dicts_to_apis(get_all_api_keys()))
+    client = ParallelTwitterClient(apis=apis)
     LOGGER.info(
         'Pulled {} valid keys'.format(len(client.operators[StatusesLookup]))
     )
@@ -180,7 +174,8 @@ def pull_hydrated_posts(posts: List[int]) -> List[Dict[str, Any]]:
     ]
 
 
-def pull_users_likes(users: List[int]) -> List[Dict[str, Any]]:
+def pull_users_likes(users: List[int],
+                     apis: List[twitter.Api]) -> List[Dict[str, Any]]:
     """
     Return the last 200 posts that each of the specified users liked.
 
@@ -188,8 +183,11 @@ def pull_users_likes(users: List[int]) -> List[Dict[str, Any]]:
     ----------
     users : List[int]
         List of Twitter API user IDs
+    apis : List[twitter.Api]
+        A list of twitter.Api objects, which can be obtained from
+        `parallel_client.oauth_dicts_to_apis`
     """
-    client = ParallelTwitterClient(apis=oauth_dicts_to_apis(get_all_api_keys()))
+    client = ParallelTwitterClient(apis=apis)
     LOGGER.info(
         'Pulled {} valid keys'.format(len(client.operators[UsersLookup]))
     )
