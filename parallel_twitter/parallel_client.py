@@ -3,7 +3,15 @@ API keys. """
 
 import logging
 import time
-from typing import Any, Dict, List, Optional, Set, Type
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Type
+)
 import heapq
 
 import twitter
@@ -12,6 +20,7 @@ from twitter import TwitterError
 from parallel_twitter.error import OutOfKeysError, not_authorized_error, rate_limit_error
 from parallel_twitter.twitter_operator import (
     GetFavorites,
+    GetFollowerIDs,
     GetFriendIDs,
     GetUserTimeline,
     StatusesLookup,
@@ -26,6 +35,7 @@ class ParallelTwitterClient:
     """ A Twitter client to distribute requests across multiple API keys. """
     OPERATORS = [
         GetFavorites,
+        GetFollowerIDs,
         GetFriendIDs,
         GetUserTimeline,
         StatusesLookup,
@@ -95,6 +105,60 @@ class ParallelTwitterClient:
             'Could not find a valid key for operator {0} and params {1}'
             .format(fn, params))
 
+    def get_followers(
+            self,
+            user_id: Optional[int] = None,
+            screen_name: Optional[str] = None,
+            min_count: int = 1,
+            batch_size: int = 5000,
+            streaming_fn: Optional[Callable[[twitter.User], Any]] = None
+        ) -> List[Any]:
+        """
+        Make multiple API requests to pull a user's Twitter following.
+        You can specify how many users to pull with each request in
+        addition to the minimum number of total users to pull.
+
+        Parameters
+        ----------
+        user_id : Optional[int]
+            The Twitter ID of the specified user
+        screen_name : Optional[str]
+            The Twitter handle of the specified user
+        min_count : Optional[int]
+            The minimum number of twitter.User objects to pull.
+            Users are fetched in increments of `batch_size`per request.
+            Defaults to 1.
+        batch_size : int
+            The number of user IDs to request from the API for each pull.
+        streaming_fn : Optional[Callable[[twitter.User], Any]]
+            If specified, this function will be executed on the returned
+            users row by row, only holding `batch_size` twitter.User objects
+            at a time.
+        """
+        batch_size = min(batch_size, min_count)
+        next_cursor, prev_cursor, fn_result = -1, None, []
+        users_count = 0
+        while True:
+            next_cursor, prev_cursor, user_ids = self._parallel_call(
+                GetFollowerIDs,
+                user_id,
+                screen_name,
+                next_cursor,
+                batch_size
+            )
+            if streaming_fn:
+                users = self.users_lookup(user_ids)
+                stream = [streaming_fn(u) for u in users]
+                fn_result.extend([v for v in stream if v is not None])
+            else:
+                fn_result.extend(user_ids)
+            users_count += len(user_ids)
+            if next_cursor == 0 \
+                    or next_cursor == prev_cursor \
+                    or users_count >= min_count:
+                break
+        return fn_result
+
     def get_friend_ids(self,
                        user_id: Optional[int] = None,
                        screen_name: Optional[str] = None,
@@ -111,10 +175,13 @@ class ParallelTwitterClient:
         max_count : Optional[int]
             The maximum number of friends to return. Defaults to 5000.
         """
-        return self._parallel_call(GetFriendIDs,
-                                   user_id,
-                                   screen_name,
-                                   max_count)
+        friend_set: Set[int] = set()
+        self._parallel_call(GetFriendIDs,
+                            user_id,
+                            screen_name,
+                            max_count,
+                            friend_set)
+        return friend_set
 
     def get_user_timeline(
             self,

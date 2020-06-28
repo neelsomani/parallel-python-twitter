@@ -105,6 +105,42 @@ class GetFriendIDs(TwitterOp):
         return '/friends/ids.json'
 
 
+class GetFollowerIDs(TwitterOp):
+    """
+    An operator to get the IDs of the users that are following the requested
+    user.
+    """
+    def _invoke(self,
+                user_id: Optional[int] = None,
+                screen_name: Optional[str] = None,
+                cursor: int = -1,
+                max_count: Optional[int] = None) -> (int, int, List[int]):
+        """
+        Return the users that are following the specified user.
+
+        Parameters
+        ----------
+        user_id : Optional[int]
+            The Twitter ID of the specified user
+        screen_name : Optional[str]
+            The Twitter handle of the specified user
+        cursor : int
+            Cursor to identify the page to pull, starting at -1
+        max_count : Optional[int]
+            The maximum number of friends to return. Defaults to 5000.
+        """
+        return self.api.GetFollowerIDsPaged(
+            user_id=user_id,
+            screen_name=screen_name,
+            cursor=cursor,
+            count=max_count
+        )
+
+    @property
+    def rate_limit_endpoint(self) -> str:
+        return '/friends/ids.json'
+
+
 class GetUserTimeline(TwitterOp):
     """
     An operator to get the posts on a user's timeline.
