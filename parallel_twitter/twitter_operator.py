@@ -3,7 +3,7 @@
 from abc import ABC
 from functools import total_ordering
 import logging
-from typing import Any, List, Optional, Set
+from typing import Any, List, Optional, Set, Tuple
 
 import twitter
 
@@ -114,7 +114,7 @@ class GetFollowerIDs(TwitterOp):
                 user_id: Optional[int] = None,
                 screen_name: Optional[str] = None,
                 cursor: int = -1,
-                max_count: Optional[int] = None) -> (int, int, List[int]):
+                max_count: Optional[int] = None) -> Tuple[int, int, List[int]]:
         """
         Return the users that are following the specified user.
 
