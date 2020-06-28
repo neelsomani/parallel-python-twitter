@@ -138,7 +138,7 @@ class GetFollowerIDs(TwitterOp):
 
     @property
     def rate_limit_endpoint(self) -> str:
-        return '/friends/ids.json'
+        return '/followers/ids.json'
 
 
 class GetUserTimeline(TwitterOp):
