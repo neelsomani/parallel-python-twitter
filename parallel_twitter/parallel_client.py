@@ -175,12 +175,10 @@ class ParallelTwitterClient:
         max_count : Optional[int]
             The maximum number of friends to return. Defaults to 5000.
         """
-        friend_set: Set[int] = set()
         self._parallel_call(GetFriendIDs,
                             user_id,
                             screen_name,
-                            max_count,
-                            friend_set)
+                            max_count)
         return friend_set
 
     def get_user_timeline(
